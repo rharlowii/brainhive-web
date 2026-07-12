@@ -137,7 +137,10 @@
       css(lt, { fontWeight: '600', minWidth: '72px', textAlign: 'right' });
       var rm = document.createElement('button'); rm.type = 'button'; rm.className = 'bh-qremove';
       rm.setAttribute('data-pn', it.pn); rm.textContent = '✕';
-      css(rm, { cursor: 'pointer', border: 'none', background: 'transparent', color: '#8A8172', fontSize: '16px' });
+      rm.title = 'Remove from quote'; rm.setAttribute('aria-label', 'Remove from quote');
+      css(rm, { cursor: 'pointer', border: 'none', background: 'transparent', color: '#8A8172',
+        fontSize: '18px', lineHeight: '1', padding: '8px', minWidth: '40px', minHeight: '40px',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center' });
       right.appendChild(stepper(it.pn, it.qty)); right.appendChild(lt); right.appendChild(rm);
       row.appendChild(info); row.appendChild(right);
       wrap.appendChild(row);
