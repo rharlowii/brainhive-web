@@ -13,6 +13,13 @@
  *   .libx-fcount                    "Showing N sets" text
  */
 (function () {
+  // Card-title 2-line clamp (moved here so no <head> custom code is needed).
+  (function () {
+    var st = document.createElement('style');
+    st.textContent = '.v3-libh3{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;height:auto!important;min-height:3.3em}';
+    (document.head || document.documentElement).appendChild(st);
+  })();
+
   var GRADE_ORDER = ['PK–K', '1–2', '3–5', '6–8', '9–12'];
   var PRICE_BANDS = ['Under $50', '$50–150', '$150–300', '$300+'];
 
