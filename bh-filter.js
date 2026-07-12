@@ -16,7 +16,7 @@
   // Card-title 2-line clamp (moved here so no <head> custom code is needed).
   (function () {
     var st = document.createElement('style');
-    st.textContent = '.v3-libh3{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;height:auto!important;min-height:3.3em}';
+    st.textContent = '.v3-libh3{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}';
     (document.head || document.documentElement).appendChild(st);
   })();
 
