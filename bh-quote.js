@@ -27,10 +27,12 @@
     var nameEl = card.querySelector('.v3-libbd .v3-libh3') || card.querySelector('.v3-libh3');
     var priceEl = card.querySelector('.v3-libprice');
     var pnEl = card.querySelector('.v3-libpn');
+    var pubEl = card.querySelector('.v3-libpub');
     return {
       pn: pnEl ? pnEl.textContent.trim() : '',
       name: nameEl ? nameEl.textContent.trim() : '',
-      price: priceEl ? priceEl.textContent.trim() : ''
+      price: priceEl ? priceEl.textContent.trim() : '',
+      pub: (pubEl && pubEl.textContent.trim()) || 'Teacher Created Materials'
     };
   }
 
@@ -38,7 +40,7 @@
   function addItem(card) {
     var d = cardData(card); if (!d.pn) return;
     var list = load();
-    if (!find(list, d.pn)) list.push({ pn: d.pn, name: d.name, price: d.price, qty: 1 });
+    if (!find(list, d.pn)) list.push({ pn: d.pn, name: d.name, price: d.price, qty: 1, pub: d.pub });
     save(list); renderAll();
   }
   function setQty(pn, qty) {
@@ -151,7 +153,7 @@
       // Tab-delimited for direct paste into the Hive spreadsheet (spreadAddFreeForm):
       // ISBN(Product#) \t Title \t QTY \t List Price \t Publisher  — one row per set, no header.
       var lines = list.map(function (x) {
-        return [x.pn, x.name, x.qty, num(x.price).toFixed(2), 'Teacher Created Materials'].join('\t');
+        return [x.pn, x.name, x.qty, num(x.price).toFixed(2), x.pub || 'Teacher Created Materials'].join('\t');
       });
       hidden.value = lines.join('\n');
     }

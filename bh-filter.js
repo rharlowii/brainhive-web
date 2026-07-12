@@ -70,7 +70,7 @@
   // cached on the element. Reads data-libfull so the pre-truncation full title is searched.
   function searchText(card) {
     if (card.__bhsearch != null) return card.__bhsearch;
-    var parts = [], sels = ['.v3-libh3', '.v3-libdesc', '.v3-libsubj', '.v3-libct', '.v3-libpn', '.v3-libtags'];
+    var parts = [], sels = ['.v3-libh3', '.v3-libdesc', '.v3-libsubj', '.v3-libct', '.v3-libpn', '.v3-libtags', '.v3-libkw'];
     for (var s = 0; s < sels.length; s++) {
       var els = card.querySelectorAll(sels[s]);
       for (var i = 0; i < els.length; i++) parts.push(els[i].getAttribute('data-libfull') || els[i].textContent);
