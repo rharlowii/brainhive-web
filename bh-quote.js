@@ -96,6 +96,28 @@
     bar.style.display = sets > 0 ? 'block' : 'none';
   }
 
+  // Inject/toggle a "Clear all" control on the quote review page (no Webflow
+  // edit needed). If the user adds their own element with class .bh-qclear,
+  // this reuses it instead of injecting a second one.
+  function ensureClearBtn(hasItems) {
+    var anchor = document.querySelector('.bh-qsubtotal') || document.querySelector('.bh-qlist');
+    if (!anchor || !anchor.parentNode) return;
+    var btn = document.querySelector('.bh-qclear');
+    if (hasItems) {
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'bh-qclear'; btn.textContent = 'Clear all';
+        css(btn, { display: 'inline-block', marginTop: '10px', cursor: 'pointer', border: 'none',
+          background: 'transparent', color: '#8A8172', textDecoration: 'underline',
+          fontSize: '14px', padding: '0' });
+        anchor.parentNode.insertBefore(btn, anchor.nextSibling);
+      }
+      btn.style.display = '';
+    } else if (btn) {
+      btn.style.display = 'none';
+    }
+  }
+
   function renderQuoteList() {
     var wrap = document.querySelector('.bh-qlist'); if (!wrap) return;
     var list = load();
@@ -130,6 +152,7 @@
       });
       hidden.value = lines.join('\n');
     }
+    ensureClearBtn(list.length > 0);
   }
 
   function renderAll() { renderCards(); renderBar(); renderQuoteList(); }
@@ -144,6 +167,8 @@
     if (plus) { e.preventDefault(); var p = plus.getAttribute('data-pn'); var i2 = find(load(), p); if (i2) setQty(p, i2.qty + 1); return; }
     var rm = e.target.closest('.bh-qremove');
     if (rm) { e.preventDefault(); setQty(rm.getAttribute('data-pn'), 0); return; }
+    var qclear = e.target.closest('.bh-qclear');
+    if (qclear) { e.preventDefault(); if (window.confirm('Remove all sets from your quote?')) { save([]); renderAll(); } return; }
     var clr = e.target.closest('.bh-quotebar-clear');
     if (clr) { e.preventDefault(); save([]); renderAll(); }
   });
