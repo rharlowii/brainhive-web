@@ -13,13 +13,6 @@
  *   .libx-fcount                    "Showing N sets" text
  */
 (function () {
-  // Card-title 2-line clamp (moved here so no <head> custom code is needed).
-  (function () {
-    var st = document.createElement('style');
-    st.textContent = '.v3-libh3{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}';
-    (document.head || document.documentElement).appendChild(st);
-  })();
-
   var GRADE_ORDER = ['PK–K', '1–2', '3–5', '6–8', '9–12'];
   var PRICE_BANDS = ['Under $50', '$50–150', '$150–300', '$300+'];
 
@@ -163,39 +156,111 @@
     apply();
   });
 
-  // --- Load every paginated page into the grid, then build the filter ---
+  // --- Card-title 2-line truncation (JS, engine-independent) ---
+  // -webkit-line-clamp is unreliable here (Webflow forces display:flow-root and
+  // some engines don't honor it), so measure + trim with an ellipsis instead.
+  // Height is derived from each title's own line-height → always exactly 2 lines
+  // (uniform card heights, breakpoint-safe). Original text kept in data-libfull
+  // so this can re-run on resize.
+  function clampTitles() {
+    var titles = document.querySelectorAll('.v3-libh3');
+    for (var i = 0; i < titles.length; i++) {
+      var el = titles[i];
+      var full = el.getAttribute('data-libfull');
+      if (full === null) { full = el.textContent; el.setAttribute('data-libfull', full); }
+      var cs = getComputedStyle(el);
+      var lh = parseFloat(cs.lineHeight); if (isNaN(lh)) lh = parseFloat(cs.fontSize) * 1.3;
+      var h = Math.ceil(lh * 2);
+      el.style.setProperty('display', 'block', 'important');
+      el.style.setProperty('overflow', 'hidden', 'important');
+      el.style.setProperty('height', h + 'px', 'important');
+      el.title = full;
+      el.textContent = full;
+      if (el.scrollHeight <= el.clientHeight + 1) continue;   // already fits in 2 lines
+      var lo = 0, hi = full.length, best = full.slice(0, 1) + '…';
+      while (lo <= hi) {
+        var mid = (lo + hi) >> 1;
+        el.textContent = full.slice(0, mid).replace(/\s+\S*$/, '') + '…';
+        if (el.scrollHeight <= el.clientHeight + 1) { best = el.textContent; lo = mid + 1; }
+        else hi = mid - 1;
+      }
+      el.textContent = best;
+    }
+  }
+
+  // --- Load every paginated page into the grid, then rebuild the filter ---
+  // Pages are fetched in PARALLEL batches (not one-at-a-time) so the grid fills
+  // in ~1 round-trip instead of N. Filters are already interactive before this
+  // runs (see init) so there's no dead period.
   function loadAll(done) {
     var grid = document.querySelector('.v3-libgrid');
     var nextEl = document.querySelector('.w-pagination-next');
     if (!grid || !nextEl) { done(); return; }           // no pagination → nothing to load
-    var nextHref = nextEl.getAttribute('href');
-    var guard = 0;
+    var firstHref = nextEl.getAttribute('href');
 
-    function step() {
-      if (!nextHref || guard++ > 25) { finish(); return; }
-      var url = new URL(nextHref, location.href).href;
-      fetch(url, { cache: 'reload' })
+    function appendItems(items) {
+      for (var i = 0; i < items.length; i++) grid.appendChild(document.importNode(items[i], true));
+    }
+    function hidePagers() {
+      var p = document.querySelectorAll('.w-pagination-wrapper');
+      for (var i = 0; i < p.length; i++) p[i].style.display = 'none';
+    }
+
+    // Detect Webflow's page param (e.g. "fe268907_page") so we can request pages by number.
+    var pageParam = null;
+    try {
+      new URL(firstHref, location.href).searchParams.forEach(function (v, k) { if (/_page$/.test(k)) pageParam = k; });
+    } catch (e) {}
+
+    // Fallback: no detectable param → follow next-links sequentially.
+    if (!pageParam) {
+      var nextHref = firstHref, guard = 0;
+      (function step() {
+        if (!nextHref || guard++ > 60) { hidePagers(); done(); return; }
+        fetch(new URL(nextHref, location.href).href, { cache: 'reload' })
+          .then(function (r) { return r.text(); })
+          .then(function (html) {
+            var doc = new DOMParser().parseFromString(html, 'text/html');
+            appendItems(doc.querySelectorAll('.v3-libgrid .w-dyn-item'));
+            var n = doc.querySelector('.w-pagination-next');
+            nextHref = n ? n.getAttribute('href') : null; step();
+          })
+          .catch(function () { hidePagers(); done(); });
+      })();
+      return;
+    }
+
+    function pageUrl(n) { var uu = new URL(location.href); uu.searchParams.set(pageParam, n); return uu.href; }
+    function fetchItems(n) {
+      return fetch(pageUrl(n), { cache: 'reload' })
         .then(function (r) { return r.text(); })
-        .then(function (html) {
-          var doc = new DOMParser().parseFromString(html, 'text/html');
-          var items = doc.querySelectorAll('.v3-libgrid .w-dyn-item');
-          for (var i = 0; i < items.length; i++) { grid.appendChild(document.importNode(items[i], true)); }
-          var n = doc.querySelector('.w-pagination-next');
-          nextHref = n ? n.getAttribute('href') : null;
-          step();
-        })
-        .catch(function () { finish(); });
+        .then(function (html) { return new DOMParser().parseFromString(html, 'text/html').querySelectorAll('.v3-libgrid .w-dyn-item'); })
+        .catch(function () { return null; });   // null = transient error (skip, don't treat as end)
     }
-    function finish() {
-      var pager = document.querySelector('.w-pagination-wrapper');
-      if (pager) pager.style.display = 'none';
-      done();
-    }
-    step();
+    var page = 2, BATCH = 8, CAP = 300;
+    (function batch() {
+      var reqs = [];
+      for (var i = 0; i < BATCH; i++) reqs.push(fetchItems(page + i));
+      Promise.all(reqs).then(function (results) {
+        var ended = false;
+        for (var j = 0; j < results.length; j++) {
+          var items = results[j];
+          if (items === null) continue;                 // fetch error → skip this page
+          if (items.length === 0) { ended = true; break; }  // empty page → past the last page
+          appendItems(items);
+        }
+        page += BATCH;
+        if (ended || page > CAP) { hidePagers(); done(); }
+        else batch();
+      });
+    })();
   }
 
   function init() {
-    loadAll(function () { buildChips(); apply(); });
+    buildChips(); apply(); clampTitles();               // page 1 is interactive immediately
+    loadAll(function () { buildChips(); apply(); clampTitles(); });  // then fold in the rest
+    var rzT;
+    window.addEventListener('resize', function () { clearTimeout(rzT); rzT = setTimeout(clampTitles, 200); });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
