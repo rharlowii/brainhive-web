@@ -25,7 +25,7 @@
 
   function cardData(card) {
     var nameEl = card.querySelector('.v3-libbd .v3-libh3') || card.querySelector('.v3-libh3');
-    var priceEl = card.querySelector('.v3-libprice');
+    var priceEl = card.querySelector('.v3-libprice') || card.querySelector('.bh-price');
     var pnEl = card.querySelector('.v3-libpn');
     var pubEl = card.querySelector('.v3-libpub');
     return {
