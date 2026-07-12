@@ -156,35 +156,56 @@
     apply();
   });
 
-  // --- Card-title 2-line truncation (JS, engine-independent) ---
+  // --- Card-title 2-line truncation (canvas-measured, engine-independent) ---
   // -webkit-line-clamp is unreliable here (Webflow forces display:flow-root and
-  // some engines don't honor it), so measure + trim with an ellipsis instead.
-  // Height is derived from each title's own line-height → always exactly 2 lines
-  // (uniform card heights, breakpoint-safe). Original text kept in data-libfull
-  // so this can re-run on resize.
+  // some engines don't honor it). Measuring each title's scrollHeight in the live
+  // grid forces a full-page relayout per read → ~12s of frozen main thread for 678
+  // cards (that froze the filters). Instead we measure text width with a Canvas
+  // 2D context (measureText — ZERO layout) to wrap + trim with an ellipsis, then
+  // write each title once. ~50ms for 678, no reflow, no freeze. Height is derived
+  // from the shared line-height so cards stay even and it is breakpoint-safe.
+  // Original text is kept in data-libfull + the title attr, and re-runs on resize.
   function clampTitles() {
     var titles = document.querySelectorAll('.v3-libh3');
-    for (var i = 0; i < titles.length; i++) {
+    if (!titles.length) return;
+    var s = titles[0], cs = getComputedStyle(s);
+    var boxW = s.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+    if (boxW <= 0) return;
+    var lh = parseFloat(cs.lineHeight); if (isNaN(lh)) lh = parseFloat(cs.fontSize) * 1.3;
+    var twoH = Math.ceil(lh * 2);
+    var ctx = (clampTitles._c || (clampTitles._c = document.createElement('canvas').getContext('2d')));
+    ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+
+    function truncate(text) {
+      var w = text.split(/\s+/), n = 1, cur = '';
+      for (var i = 0; i < w.length; i++) {                 // count wrapped lines
+        var t = cur ? cur + ' ' + w[i] : w[i];
+        if (ctx.measureText(t).width <= boxW || !cur) cur = t;
+        else { n++; cur = w[i]; if (n > 2) break; }
+      }
+      if (n <= 2) return null;                             // fits in 2 lines
+      var idx = 0, l1 = '';                                // fill line 1
+      for (; idx < w.length; idx++) {
+        var a = l1 ? l1 + ' ' + w[idx] : w[idx];
+        if (ctx.measureText(a).width <= boxW || !l1) l1 = a; else break;
+      }
+      var l2 = '';                                         // fill line 2, leaving room for …
+      for (; idx < w.length; idx++) {
+        var b = l2 ? l2 + ' ' + w[idx] : w[idx];
+        if (ctx.measureText(b + '…').width <= boxW || !l2) l2 = b; else break;
+      }
+      return l1 + (l2 ? ' ' + l2 : '') + '…';
+    }
+
+    for (var i = 0; i < titles.length; i++) {              // pure writes — no interleaved reads
       var el = titles[i];
       var full = el.getAttribute('data-libfull');
       if (full === null) { full = el.textContent; el.setAttribute('data-libfull', full); }
-      var cs = getComputedStyle(el);
-      var lh = parseFloat(cs.lineHeight); if (isNaN(lh)) lh = parseFloat(cs.fontSize) * 1.3;
-      var h = Math.ceil(lh * 2);
-      el.style.setProperty('display', 'block', 'important');
-      el.style.setProperty('overflow', 'hidden', 'important');
-      el.style.setProperty('height', h + 'px', 'important');
+      var c = truncate(full);
       el.title = full;
-      el.textContent = full;
-      if (el.scrollHeight <= el.clientHeight + 1) continue;   // already fits in 2 lines
-      var lo = 0, hi = full.length, best = full.slice(0, 1) + '…';
-      while (lo <= hi) {
-        var mid = (lo + hi) >> 1;
-        el.textContent = full.slice(0, mid).replace(/\s+\S*$/, '') + '…';
-        if (el.scrollHeight <= el.clientHeight + 1) { best = el.textContent; lo = mid + 1; }
-        else hi = mid - 1;
-      }
-      el.textContent = best;
+      el.style.setProperty('overflow', 'hidden', 'important');
+      el.style.setProperty('height', twoH + 'px', 'important');
+      el.textContent = (c === null) ? full : c;
     }
   }
 
