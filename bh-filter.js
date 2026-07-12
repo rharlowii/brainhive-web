@@ -180,6 +180,7 @@
   // from the shared line-height so cards stay even and it is breakpoint-safe.
   // Original text is kept in data-libfull + the title attr, and re-runs on resize.
   function clampTitles() {
+    if (!document.querySelector('.v3-libgrid')) return;   // grid page only — leave detail-page titles alone
     var titles = document.querySelectorAll('.v3-libh3');
     if (!titles.length) return;
     var s = titles[0], cs = getComputedStyle(s);

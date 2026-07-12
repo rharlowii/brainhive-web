@@ -30,7 +30,7 @@
     var pubEl = card.querySelector('.v3-libpub');
     return {
       pn: pnEl ? pnEl.textContent.trim() : '',
-      name: nameEl ? nameEl.textContent.trim() : '',
+      name: nameEl ? (nameEl.getAttribute('data-libfull') || nameEl.textContent).trim() : '',
       price: priceEl ? priceEl.textContent.trim() : '',
       pub: (pubEl && pubEl.textContent.trim()) || 'Teacher Created Materials'
     };
