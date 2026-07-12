@@ -64,6 +64,19 @@
 
   var selected = {};
   var groups = [];
+  var query = '';
+
+  // Full searchable text per card (name + description + subject + content + item# + tags),
+  // cached on the element. Reads data-libfull so the pre-truncation full title is searched.
+  function searchText(card) {
+    if (card.__bhsearch != null) return card.__bhsearch;
+    var parts = [], sels = ['.v3-libh3', '.v3-libdesc', '.v3-libsubj', '.v3-libct', '.v3-libpn', '.v3-libtags'];
+    for (var s = 0; s < sels.length; s++) {
+      var els = card.querySelectorAll(sels[s]);
+      for (var i = 0; i < els.length; i++) parts.push(els[i].getAttribute('data-libfull') || els[i].textContent);
+    }
+    return (card.__bhsearch = parts.join(' ').toLowerCase());
+  }
 
   function makeChip(label) {
     var c = document.createElement('div');
@@ -133,6 +146,7 @@
         for (var k = 0; k < keys.length; k++) { if (cv.indexOf(keys[k]) > -1) { hit = true; break; } }
         if (!hit) { ok = false; break; }
       }
+      if (ok && query && searchText(card).indexOf(query) < 0) ok = false;
       var item = card.closest('.w-dyn-item') || card;
       item.style.display = ok ? '' : 'none';
       if (ok) shown++;
@@ -277,9 +291,55 @@
     })();
   }
 
+  // --- Sort the grid by set name, A→Z (natural/numeric, punctuation-insensitive) ---
+  // The CMS's own order reads as random once filtered; this makes it predictable.
+  function sortGrid() {
+    var grid = document.querySelector('.v3-libgrid');
+    if (!grid) return;
+    var items = [].slice.call(grid.querySelectorAll('.w-dyn-item'));
+    if (items.length < 2) return;
+    function key(item) {
+      var h = item.querySelector('.v3-libh3');           // first .v3-libh3 = the set name
+      var s = h ? (h.getAttribute('data-libfull') || h.textContent) : '';
+      return s.replace(/^[^0-9A-Za-zÀ-ɏ]+/, '').trim();   // drop leading ¡ ¿ " etc.
+    }
+    items.sort(function (a, b) { return key(a).localeCompare(key(b), undefined, { numeric: true, sensitivity: 'base' }); });
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < items.length; i++) frag.appendChild(items[i]);  // moves nodes into sorted order
+    grid.appendChild(frag);
+  }
+
+  // --- Inject a keyword search box above the Grade filter (no Webflow edit needed) ---
+  // Reuses an existing .libx-search input if the user adds one in Webflow.
+  function ensureSearch() {
+    var bar = document.querySelector('.libx-fbar');
+    if (!bar || document.querySelector('.libx-search')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'libx-fgroup libx-searchgroup';       // .libx-fgroup for spacing; buildChips skips it (no dim)
+    var label = document.createElement('div');
+    label.className = 'libx-flabel'; label.textContent = 'Search';
+    var input = document.createElement('input');
+    input.type = 'search'; input.className = 'libx-search';
+    input.placeholder = 'Search sets, subjects, item #…';
+    input.setAttribute('autocomplete', 'off');
+    input.style.cssText = 'width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #E4DFD3;'
+      + 'border-radius:8px;font-size:15px;color:#17130C;background:#fff;outline:none';
+    wrap.appendChild(label); wrap.appendChild(input);
+    bar.insertBefore(wrap, bar.firstChild);
+  }
+
+  var searchT;
+  document.addEventListener('input', function (e) {
+    var t = e.target;
+    if (!t || !t.classList || !t.classList.contains('libx-search')) return;
+    clearTimeout(searchT);
+    searchT = setTimeout(function () { query = (t.value || '').trim().toLowerCase(); apply(); }, 120);
+  });
+
   function init() {
+    ensureSearch();
     buildChips(); apply(); clampTitles();               // page 1 is interactive immediately
-    loadAll(function () { buildChips(); apply(); clampTitles(); });  // then fold in the rest
+    loadAll(function () { sortGrid(); buildChips(); apply(); clampTitles(); });  // sort + fold in the rest
     var rzT;
     window.addEventListener('resize', function () { clearTimeout(rzT); rzT = setTimeout(clampTitles, 200); });
   }
