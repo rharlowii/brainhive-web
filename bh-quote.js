@@ -23,13 +23,21 @@
   function num(s) { var n = parseFloat(String(s).replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; }
   function money(n) { return '$' + n.toFixed(2); }
 
+  // On a set detail page (/librarysets/<slug>) the product number is the trailing
+  // digits of the slug (e.g. tcm-899944 → 899944) — authoritative, no binding needed.
+  function detailPn() {
+    if (!/^\/librarysets\//.test(location.pathname)) return '';
+    var m = (location.pathname.split('/').pop() || '').match(/(\d+)\s*$/);
+    return m ? m[1] : '';
+  }
+
   function cardData(card) {
     var nameEl = card.querySelector('.v3-libbd .v3-libh3') || card.querySelector('.v3-libh3');
     var priceEl = card.querySelector('.v3-libprice') || card.querySelector('.bh-price');
     var pnEl = card.querySelector('.v3-libpn');
     var pubEl = card.querySelector('.v3-libpub');
     return {
-      pn: pnEl ? pnEl.textContent.trim() : '',
+      pn: detailPn() || (pnEl ? pnEl.textContent.trim() : ''),
       name: nameEl ? (nameEl.getAttribute('data-libfull') || nameEl.textContent).trim() : '',
       price: priceEl ? priceEl.textContent.trim() : '',
       pub: (pubEl && pubEl.textContent.trim()) || 'Teacher Created Materials'
