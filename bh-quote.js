@@ -40,7 +40,9 @@
       pn: detailPn() || (pnEl ? pnEl.textContent.trim() : ''),
       name: nameEl ? (nameEl.getAttribute('data-libfull') || nameEl.textContent).trim() : '',
       price: priceEl ? priceEl.textContent.trim() : '',
-      pub: (pubEl && pubEl.textContent.trim()) || 'Teacher Created Materials'
+      // On detail pages the .v3-libpub hook may be an unbound placeholder — ignore it there
+      // and use the TCM default (all current sets are TCM); the grid keeps the real per-set value.
+      pub: (detailPn() ? '' : (pubEl && pubEl.textContent.trim())) || 'Teacher Created Materials'
     };
   }
 
