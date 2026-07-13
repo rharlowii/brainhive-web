@@ -13,6 +13,15 @@
  *   .libx-fcount                    "Showing N sets" text
  */
 (function () {
+  // Make the cover link (an <a> Designer-linked to the current item) fill the
+  // cover as an invisible click target. Sizing it from CSS avoids needing a
+  // Designer class on the link block. Grid only; the detail cover has no <a>.
+  (function () {
+    var st = document.createElement('style');
+    st.textContent = '.v3-libcover{position:relative}.v3-libcover a{position:absolute;top:0;right:0;bottom:0;left:0;z-index:2}';
+    (document.head || document.documentElement).appendChild(st);
+  })();
+
   var GRADE_ORDER = ['PK–K', '1–2', '3–5', '6–8', '9–12'];
   var PRICE_BANDS = ['Under $50', '$50–150', '$150–300', '$300+'];
 
