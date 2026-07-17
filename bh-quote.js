@@ -23,7 +23,7 @@
   function num(s) { var n = parseFloat(String(s).replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; }
   function money(n) { return '$' + n.toFixed(2); }
 
-  // On the legacy TCM set detail page (/librarysets/<slug>) the product number is
+  // On the legacy set detail page (/librarysets/<slug>) the product number is
   // the trailing digits of the slug (e.g. tcm-899944 → 899944) — authoritative there.
   // The .v3-libpn hook on THAT page is an unbound Webflow placeholder ("000000"),
   // not real data, so it must never win over the slug on this path.
@@ -43,17 +43,18 @@
     // /librarysets/ slug (still authoritative on that page — see detailPn() above),
     // then the .v3-libpn hook's text used VERBATIM (ISBNs carry hyphens and
     // "-PG" guide-variant suffixes — do not strip non-digits like the old slug regex did).
-    // This covers both the TCM grid (.v3-libpn = real item#) and new backpack rows
-    // (.v3-libpn = real ISBN) without touching the protected TCM detail-page path.
+    // This covers both the legacy grid (.v3-libpn = real item#) and new backpack rows
+    // (.v3-libpn = real ISBN) without touching the protected slug-based detail-page path.
     return {
       pn: isbnAttr || detailPn() || (pnEl ? pnEl.textContent.trim() : ''),
       name: nameEl ? (nameEl.getAttribute('data-libfull') || nameEl.textContent).trim() : '',
       price: priceEl ? priceEl.textContent.trim() : '',
-      // On the legacy TCM detail page the .v3-libpub hook is the same kind of unbound
-      // placeholder ("Publisher") — keep the TCM default there. Everywhere else (grid
-      // cards, new backpack rows) read the real bound .v3-libpub text; fall back to
-      // empty (not a hardcoded publisher) so non-TCM lines never get mislabeled.
-      pub: detailPn() ? 'Teacher Created Materials' : ((pubEl && pubEl.textContent.trim()) || '')
+      // Publisher-agnostic distributor: read the bound .v3-libpub hook everywhere,
+      // falling back to empty — never a hardcoded publisher. NOTE: on the current
+      // /librarysets/ detail page this hook is still an unbound placeholder until a
+      // human binds it to the collection's publisher field (see report), so an item
+      // added from that detail page reads whatever text the hook shows until then.
+      pub: (pubEl && pubEl.textContent.trim()) || ''
     };
   }
 
@@ -153,7 +154,7 @@
       var it = list[i]; var lineTotal = num(it.price) * it.qty; subtotal += lineTotal;
       var row = document.createElement('div'); row.className = 'bh-qrow';
       var info = document.createElement('div'); info.className = 'bh-qinfo';
-      info.textContent = it.name + '  ·  ' + (it.pub || '') + ' ' + it.pn + '  ·  ' + money(num(it.price)) + ' each';
+      info.textContent = it.name + '  ·  ' + [it.pub, it.pn].filter(Boolean).join(' ') + '  ·  ' + money(num(it.price)) + ' each';
       var right = document.createElement('div');
       css(right, { display: 'flex', alignItems: 'center', columnGap: '16px' });
       var lt = document.createElement('span'); lt.textContent = money(lineTotal);
@@ -174,7 +175,7 @@
       // Tab-delimited for direct paste into the Hive spreadsheet (spreadAddFreeForm):
       // ISBN(Product#) \t Title \t QTY \t List Price \t Publisher  — one row per set, no header.
       var lines = list.map(function (x) {
-        return [x.pn, x.name, x.qty, num(x.price).toFixed(2), x.pub || 'Teacher Created Materials'].join('\t');
+        return [x.pn, x.name, x.qty, num(x.price).toFixed(2), x.pub || ''].join('\t');
       });
       hidden.value = lines.join('\n');
     }
