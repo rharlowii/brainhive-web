@@ -23,8 +23,10 @@
   function num(s) { var n = parseFloat(String(s).replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; }
   function money(n) { return '$' + n.toFixed(2); }
 
-  // On a set detail page (/librarysets/<slug>) the product number is the trailing
-  // digits of the slug (e.g. tcm-899944 → 899944) — authoritative, no binding needed.
+  // On the legacy TCM set detail page (/librarysets/<slug>) the product number is
+  // the trailing digits of the slug (e.g. tcm-899944 → 899944) — authoritative there.
+  // The .v3-libpn hook on THAT page is an unbound Webflow placeholder ("000000"),
+  // not real data, so it must never win over the slug on this path.
   function detailPn() {
     if (!/^\/librarysets\//.test(location.pathname)) return '';
     var m = (location.pathname.split('/').pop() || '').match(/(\d+)\s*$/);
@@ -36,13 +38,22 @@
     var priceEl = card.querySelector('.v3-libprice') || card.querySelector('.bh-price');
     var pnEl = card.querySelector('.v3-libpn');
     var pubEl = card.querySelector('.v3-libpub');
+    var isbnAttr = (card.getAttribute('data-isbn') || '').trim();
+    // Product number resolution: an explicit data-isbn override, then the legacy
+    // /librarysets/ slug (still authoritative on that page — see detailPn() above),
+    // then the .v3-libpn hook's text used VERBATIM (ISBNs carry hyphens and
+    // "-PG" guide-variant suffixes — do not strip non-digits like the old slug regex did).
+    // This covers both the TCM grid (.v3-libpn = real item#) and new backpack rows
+    // (.v3-libpn = real ISBN) without touching the protected TCM detail-page path.
     return {
-      pn: detailPn() || (pnEl ? pnEl.textContent.trim() : ''),
+      pn: isbnAttr || detailPn() || (pnEl ? pnEl.textContent.trim() : ''),
       name: nameEl ? (nameEl.getAttribute('data-libfull') || nameEl.textContent).trim() : '',
       price: priceEl ? priceEl.textContent.trim() : '',
-      // On detail pages the .v3-libpub hook may be an unbound placeholder — ignore it there
-      // and use the TCM default (all current sets are TCM); the grid keeps the real per-set value.
-      pub: (detailPn() ? '' : (pubEl && pubEl.textContent.trim())) || 'Teacher Created Materials'
+      // On the legacy TCM detail page the .v3-libpub hook is the same kind of unbound
+      // placeholder ("Publisher") — keep the TCM default there. Everywhere else (grid
+      // cards, new backpack rows) read the real bound .v3-libpub text; fall back to
+      // empty (not a hardcoded publisher) so non-TCM lines never get mislabeled.
+      pub: detailPn() ? 'Teacher Created Materials' : ((pubEl && pubEl.textContent.trim()) || '')
     };
   }
 
@@ -142,7 +153,7 @@
       var it = list[i]; var lineTotal = num(it.price) * it.qty; subtotal += lineTotal;
       var row = document.createElement('div'); row.className = 'bh-qrow';
       var info = document.createElement('div'); info.className = 'bh-qinfo';
-      info.textContent = it.name + '  ·  TCM ' + it.pn + '  ·  ' + money(num(it.price)) + ' each';
+      info.textContent = it.name + '  ·  ' + (it.pub || '') + ' ' + it.pn + '  ·  ' + money(num(it.price)) + ' each';
       var right = document.createElement('div');
       css(right, { display: 'flex', alignItems: 'center', columnGap: '16px' });
       var lt = document.createElement('span'); lt.textContent = money(lineTotal);

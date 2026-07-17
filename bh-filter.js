@@ -40,7 +40,7 @@
     if (dim === 'grade') return (txt(card, '.v3-libgb') || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
     if (dim === 'subject') { var s = txt(card, '.v3-libsubj'); return s ? [s] : []; }
     if (dim === 'content') { var c = txt(card, '.v3-libct'); return c ? [c] : []; }
-    if (dim === 'language') { var l = txt(card, '.v3-liblang'); return l ? [l] : []; }
+    if (dim === 'language') return (txt(card, '.v3-liblang') || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
     if (dim === 'price') { var b = priceBand(card); return b ? [b] : []; }
     return [];
   }
