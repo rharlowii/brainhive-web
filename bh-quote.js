@@ -86,10 +86,28 @@
         background: GOLD, color: INK, cursor: 'pointer', fontWeight: '700', lineHeight: '1', fontSize: '15px' });
       return b;
     }
-    var n = document.createElement('span'); n.className = 'bh-qnum'; n.textContent = qty;
-    css(n, { minWidth: '18px', textAlign: 'center', fontWeight: '600', fontSize: '14px', color: INK });
+    // Typeable quantity: schools often order 100+, so stepping one at a time is unusable.
+    // Commits on change/Enter (not per keystroke) so a re-render can't steal focus mid-typing.
+    var n = document.createElement('input');
+    n.className = 'bh-qnum'; n.type = 'text'; n.value = qty;
+    n.setAttribute('inputmode', 'numeric'); n.setAttribute('aria-label', 'Quantity');
+    n.setAttribute('data-pn', pn);
+    css(n, { width: '46px', textAlign: 'center', fontWeight: '600', fontSize: '14px', color: INK,
+      border: 'none', background: 'transparent', padding: '0', outline: 'none',
+      MozAppearance: 'textfield' });
     wrap.appendChild(btn('−', 'minus')); wrap.appendChild(n); wrap.appendChild(btn('+', 'plus'));
     return wrap;
+  }
+
+  // Read the committed value out of a qty input; blank/garbage reverts, 0 removes the line.
+  function commitQty(input) {
+    var pn = input.getAttribute('data-pn');
+    var it = find(load(), pn); if (!it) return;
+    var raw = (input.value || '').replace(/[^0-9]/g, '');
+    if (raw === '') { input.value = it.qty; return; }        // nothing typed -> restore
+    var q = parseInt(raw, 10);
+    if (isNaN(q) || q === it.qty) { input.value = it.qty; return; }
+    setQty(pn, q);
   }
 
   // --- render the card controls (Add button ⇄ stepper) ---
@@ -102,7 +120,11 @@
       var existing = card.querySelector('.bh-qtywrap');
       if (it) {
         btn.style.display = 'none';
-        if (existing) { existing.querySelector('.bh-qnum').textContent = it.qty; }
+        if (existing) {
+          var qi = existing.querySelector('.bh-qnum');
+          // don't clobber what the user is currently typing
+          if (qi && qi !== document.activeElement) qi.value = it.qty;
+        }
         else { btn.parentNode.insertBefore(stepper(it.pn, it.qty), btn.nextSibling); }
       } else {
         btn.style.display = '';
@@ -198,6 +220,17 @@
     if (qclear) { e.preventDefault(); if (window.confirm('Remove all sets from your quote?')) { save([]); renderAll(); } return; }
     var clr = e.target.closest('.bh-quotebar-clear');
     if (clr) { e.preventDefault(); save([]); renderAll(); }
+  });
+
+  // commit a typed quantity on blur/change, and on Enter
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t && t.classList && t.classList.contains('bh-qnum')) commitQty(t);
+  });
+  document.addEventListener('keydown', function (e) {
+    var t = e.target;
+    if (!t || !t.classList || !t.classList.contains('bh-qnum')) return;
+    if (e.key === 'Enter') { e.preventDefault(); commitQty(t); t.blur(); }
   });
 
   // clear the quote after a successful Webflow form submit
