@@ -304,6 +304,9 @@
   // --- Sort the grid by set name, A→Z (natural/numeric, punctuation-insensitive) ---
   // The CMS's own order reads as random once filtered; this makes it predictable.
   function sortGrid() {
+    // Only re-sort where filtering actually happens. On grids with no filter bar
+    // (e.g. take-home backpacks) the CMS sort order is curated, so leave it alone.
+    if (!document.querySelector('.libx-fbar')) return;
     var grid = document.querySelector('.v3-libgrid');
     if (!grid) return;
     var items = [].slice.call(grid.querySelectorAll('.w-dyn-item'));
