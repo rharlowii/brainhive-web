@@ -316,7 +316,18 @@
       var s = h ? (h.getAttribute('data-libfull') || h.textContent) : '';
       return s.replace(/^[^0-9A-Za-zÀ-ɏ]+/, '').trim();   // drop leading ¡ ¿ " etc.
     }
-    items.sort(function (a, b) { return key(a).localeCompare(key(b), undefined, { numeric: true, sensitivity: 'base' }); });
+    // Curated priority tier (CMS "Sort") wins; alphabetical only breaks ties inside a tier.
+    // Cards without a .v3-libsort value fall to the end, so this degrades to pure A-Z.
+    function tier(item) {
+      var el = item.querySelector('.v3-libsort');
+      var n = el ? parseInt((el.textContent || '').replace(/[^0-9-]/g, ''), 10) : NaN;
+      return isNaN(n) ? Infinity : n;
+    }
+    items.sort(function (a, b) {
+      var ta = tier(a), tb = tier(b);
+      if (ta !== tb) return ta - tb;
+      return key(a).localeCompare(key(b), undefined, { numeric: true, sensitivity: 'base' });
+    });
     var frag = document.createDocumentFragment();
     for (var i = 0; i < items.length; i++) frag.appendChild(items[i]);  // moves nodes into sorted order
     grid.appendChild(frag);
