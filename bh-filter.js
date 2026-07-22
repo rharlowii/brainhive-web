@@ -398,8 +398,10 @@
   function ensureSort() {
     var slot = document.querySelector('.libx-sortslot');
     if (!slot || slot.querySelector('.libx-sort')) return;
+    // Its own class, not .libx-flabel — that one is sized to sit above a chip
+    // row and renders far too tall above a select.
     var label = document.createElement('div');
-    label.className = 'libx-flabel'; label.textContent = 'Sort by';
+    label.className = 'libx-sortlabel'; label.textContent = 'Sort by';
     var sel = document.createElement('select');
     sel.className = 'libx-sort';
     sel.setAttribute('aria-label', 'Sort sets');
