@@ -23,6 +23,8 @@
   })();
 
   var GRADE_ORDER = ['PK–K', '1–2', '3–5', '6–8', '9–12'];
+  // Publisher alignment before UFLI's own listing — they are different claims.
+  var UFLI_ORDER = ['UFLI aligned', 'On the UFLI text guide'];
   var PRICE_BANDS = ['Under $50', '$50–150', '$150–300', '$300+'];
 
   function txt(el, sel) { var n = el.querySelector(sel); return n ? n.textContent.trim() : ''; }
@@ -46,6 +48,8 @@
     if (dim === 'skill') return (txt(card, '.v3-libkw') || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
     if (dim === 'publisher') { var p = txt(card, '.v3-libpub'); return p ? [p] : []; }
     if (dim === 'pack') { var pk = txt(card, '.v3-libpk'); return pk ? [pk] : []; }
+    // Blank for most sets — cards with no UFLI relationship simply match no chip.
+    if (dim === 'ufli') { var uf = txt(card, '.v3-libufli'); return uf ? [uf] : []; }
     return [];
   }
 
@@ -59,6 +63,7 @@
     if (u.indexOf('SKILL') > -1) return 'skill';
     if (u.indexOf('PUBLISH') > -1) return 'publisher';
     if (u.indexOf('PACK') > -1) return 'pack';
+    if (u.indexOf('UFLI') > -1) return 'ufli';
     return null;
   }
 
@@ -87,7 +92,7 @@
   // cached on the element. Reads data-libfull so the pre-truncation full title is searched.
   function searchText(card) {
     if (card.__bhsearch != null) return card.__bhsearch;
-    var parts = [], sels = ['.v3-libh3', '.v3-libdesc', '.v3-libsubj', '.v3-libct', '.v3-libpn', '.v3-libtags', '.v3-libkw', '.v3-libpub'];
+    var parts = [], sels = ['.v3-libh3', '.v3-libdesc', '.v3-libsubj', '.v3-libct', '.v3-libpn', '.v3-libtags', '.v3-libkw', '.v3-libpub', '.v3-libufli'];
     for (var s = 0; s < sels.length; s++) {
       var els = card.querySelectorAll(sels[s]);
       for (var i = 0; i < els.length; i++) parts.push(els[i].getAttribute('data-libfull') || els[i].textContent);
@@ -115,6 +120,7 @@
       for (var i = 0; i < cards.length; i++) { vals = vals.concat(cardValues(cards[i], dim)); }
       vals = distinct(vals);
       if (dim === 'grade') vals = orderBy(vals, GRADE_ORDER);
+      else if (dim === 'ufli') vals = orderBy(vals, UFLI_ORDER);
       else if (dim === 'price') vals = PRICE_BANDS.filter(function (b) { return vals.indexOf(b) > -1; });
       else vals.sort();
 
