@@ -45,6 +45,7 @@
     // Decodables: phonics skills are comma-separated in .v3-libkw; publisher is single-valued.
     if (dim === 'skill') return (txt(card, '.v3-libkw') || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
     if (dim === 'publisher') { var p = txt(card, '.v3-libpub'); return p ? [p] : []; }
+    if (dim === 'pack') { var pk = txt(card, '.v3-libpk'); return pk ? [pk] : []; }
     return [];
   }
 
@@ -57,6 +58,7 @@
     if (u.indexOf('LANG') > -1) return 'language';
     if (u.indexOf('SKILL') > -1) return 'skill';
     if (u.indexOf('PUBLISH') > -1) return 'publisher';
+    if (u.indexOf('PACK') > -1) return 'pack';
     return null;
   }
 
