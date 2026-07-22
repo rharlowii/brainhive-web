@@ -42,6 +42,9 @@
     if (dim === 'content') { var c = txt(card, '.v3-libct'); return c ? [c] : []; }
     if (dim === 'language') return (txt(card, '.v3-liblang') || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
     if (dim === 'price') { var b = priceBand(card); return b ? [b] : []; }
+    // Decodables: phonics skills are comma-separated in .v3-libkw; publisher is single-valued.
+    if (dim === 'skill') return (txt(card, '.v3-libkw') || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    if (dim === 'publisher') { var p = txt(card, '.v3-libpub'); return p ? [p] : []; }
     return [];
   }
 
@@ -52,6 +55,8 @@
     if (u.indexOf('CONTENT') > -1) return 'content';
     if (u.indexOf('PRICE') > -1) return 'price';
     if (u.indexOf('LANG') > -1) return 'language';
+    if (u.indexOf('SKILL') > -1) return 'skill';
+    if (u.indexOf('PUBLISH') > -1) return 'publisher';
     return null;
   }
 
@@ -74,12 +79,13 @@
   var selected = {};
   var groups = [];
   var query = '';
+  var sortMode = 'curated';   // 'curated' | 'publisher' | 'name' | 'price-asc' | 'price-desc'
 
   // Full searchable text per card (name + description + subject + content + item# + tags),
   // cached on the element. Reads data-libfull so the pre-truncation full title is searched.
   function searchText(card) {
     if (card.__bhsearch != null) return card.__bhsearch;
-    var parts = [], sels = ['.v3-libh3', '.v3-libdesc', '.v3-libsubj', '.v3-libct', '.v3-libpn', '.v3-libtags', '.v3-libkw'];
+    var parts = [], sels = ['.v3-libh3', '.v3-libdesc', '.v3-libsubj', '.v3-libct', '.v3-libpn', '.v3-libtags', '.v3-libkw', '.v3-libpub'];
     for (var s = 0; s < sels.length; s++) {
       var els = card.querySelectorAll(sels[s]);
       for (var i = 0; i < els.length; i++) parts.push(els[i].getAttribute('data-libfull') || els[i].textContent);
@@ -323,11 +329,45 @@
       var n = el ? parseInt((el.textContent || '').replace(/[^0-9-]/g, ''), 10) : NaN;
       return isNaN(n) ? Infinity : n;
     }
-    items.sort(function (a, b) {
-      var ta = tier(a), tb = tier(b);
-      if (ta !== tb) return ta - tb;
+    function pubKey(item) {
+      var el = item.querySelector('.v3-libpub');
+      return el ? (el.getAttribute('data-libfull') || el.textContent || '').trim() : '';
+    }
+    function priceVal(item) {
+      var el = item.querySelector('.v3-libprice');
+      var n = parseFloat((el ? el.textContent : '').replace(/[^0-9.]/g, ''));
+      return isNaN(n) ? Infinity : n;
+    }
+    function byName(a, b) {
       return key(a).localeCompare(key(b), undefined, { numeric: true, sensitivity: 'base' });
-    });
+    }
+    var cmp;
+    if (sortMode === 'publisher') {
+      // Publisher A–Z, then set name inside each publisher. Unlabelled cards sort last.
+      cmp = function (a, b) {
+        var pa = pubKey(a), pb = pubKey(b);
+        if (!pa !== !pb) return pa ? -1 : 1;
+        if (pa !== pb) return pa.localeCompare(pb, undefined, { sensitivity: 'base' });
+        return byName(a, b);
+      };
+    } else if (sortMode === 'name') {
+      cmp = byName;
+    } else if (sortMode === 'price-asc') {
+      cmp = function (a, b) { return (priceVal(a) - priceVal(b)) || byName(a, b); };
+    } else if (sortMode === 'price-desc') {
+      cmp = function (a, b) {
+        var pa = priceVal(a), pb = priceVal(b);
+        if (pa === Infinity || pb === Infinity) return pa - pb;   // priceless cards stay last
+        return (pb - pa) || byName(a, b);
+      };
+    } else {
+      cmp = function (a, b) {
+        var ta = tier(a), tb = tier(b);
+        if (ta !== tb) return ta - tb;
+        return byName(a, b);
+      };
+    }
+    items.sort(cmp);
     var frag = document.createDocumentFragment();
     for (var i = 0; i < items.length; i++) frag.appendChild(items[i]);  // moves nodes into sorted order
     grid.appendChild(frag);
@@ -352,6 +392,36 @@
     bar.insertBefore(wrap, bar.firstChild);
   }
 
+  // --- Sort control (OPT-IN) -------------------------------------------------
+  // Only rendered where the page provides an empty <div class="libx-sortslot">.
+  // Pages without that slot (e.g. /classroom-libraries) are untouched.
+  function ensureSort() {
+    var slot = document.querySelector('.libx-sortslot');
+    if (!slot || slot.querySelector('.libx-sort')) return;
+    var label = document.createElement('div');
+    label.className = 'libx-flabel'; label.textContent = 'Sort by';
+    var sel = document.createElement('select');
+    sel.className = 'libx-sort';
+    sel.setAttribute('aria-label', 'Sort sets');
+    sel.style.cssText = 'width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #E4DFD3;'
+      + 'border-radius:8px;font-size:15px;color:#17130C;background:#fff;outline:none';
+    var opts = [['curated', 'Recommended'], ['publisher', 'Publisher A–Z'], ['name', 'Name A–Z'],
+                ['price-asc', 'Price: low to high'], ['price-desc', 'Price: high to low']];
+    for (var i = 0; i < opts.length; i++) {
+      var o = document.createElement('option');
+      o.value = opts[i][0]; o.textContent = opts[i][1];
+      sel.appendChild(o);
+    }
+    slot.appendChild(label); slot.appendChild(sel);
+  }
+
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (!t || !t.classList || !t.classList.contains('libx-sort')) return;
+    sortMode = t.value || 'curated';
+    sortGrid(); apply(); clampTitles();
+  });
+
   var searchT;
   document.addEventListener('input', function (e) {
     var t = e.target;
@@ -361,7 +431,7 @@
   });
 
   function init() {
-    ensureSearch();
+    ensureSearch(); ensureSort();
     buildChips(); apply(); clampTitles();               // page 1 is interactive immediately
     loadAll(function () { sortGrid(); buildChips(); apply(); clampTitles(); });  // sort + fold in the rest
     var rzT;
